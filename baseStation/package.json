@@ -1,0 +1,26 @@
+{
+  "name": "ZigBeeBaseStation",
+  "version": "0.0.1",
+  "description": "Javascript program communicating to a ZigBee network through a Zigbee explorer module via serial in order to retrieve temperature readings from wireless sensor modules. The communication between the ZigBee explorer and this program is done through ZigBee API mode 2.",
+  "main": "._baseStation.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EC544-2015-Group2/Challenge1.git"
+  },
+  "author": "ghirlekar",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/EC544-2015-Group2/Challenge1/issues"
+  },
+  "homepage": "https://github.com/EC544-2015-Group2/Challenge1#readme",
+  "dependencies": {
+    "assert": "^1.3.0",
+    "mongodb": "^2.0.43",
+    "mqtt": "^1.4.0",
+    "serialport": "^1.7.4",
+    "xbee-api": "^0.3.12"
+  }
+}

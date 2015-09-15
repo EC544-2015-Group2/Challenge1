@@ -1,40 +1,42 @@
+#include <Printers.h>
+#include <XBee.h>
+
 #include <math.h>
 
-const String deviceID = "0xff3b";
-const String broadcastID = "0xffff";
+
+XBee xbee = XBee();
+XBeeResponse response = XBeeResponse();
+//ZBRxResponse rx = ZBRxResponse();
+ModemStatusResponse msr = ModemStatusResponse();
+
+uint8_t introPayload[] = {'{', 't', 'e', 'm', 'p', '}'};  
+uint8_t dataPayload[5];
+
+XBeeAddress64 coordAddr64 = XBeeAddress64(0x00000000, 0x00000000);
+ZBTxRequest zbIntroTx = ZBTxRequest(coordAddr64, introPayload, sizeof(introPayload));
+ZBTxRequest zbDataTx = ZBTxRequest(coordAddr64, dataPayload, sizeof(dataPayload));
+
 const int thermPin = A0;
 
 double Vout, Rth, temp;
 unsigned long timestamp = 0, now, period = 1000;
-String serialStr = "";
-boolean serialStrComplete = false, sync = false;
-char inChar;
+boolean introMessageSent = false, sync = false;
 
 void setup() {
   Serial.begin(9600);
-  pinMode(thermPin, INPUT);
+  xbee.begin(Serial);
+  xbee.send(zbIntroTx);
+  //  pinMode(thermPin, INPUT);
 }
 
 void loop() {
-  while (Serial.available()) {
-    inChar = (char) Serial.read();
-    if (inChar == '\n') {
-      serialStrComplete = true;
-      break;
-    } else serialStr += inChar;
-  }
-
-  if (serialStrComplete) {
-    if (serialStr.startsWith(deviceID) || serialStr.startsWith(broadcastID)) {
-      serialStr = serialStr.substring(7);
-      if (serialStr.startsWith("SYNC")) {
-        sync = true;
-      } else if (serialStr.startsWith("SET")) {
-        period = serialStr.substring(3).toInt();
-      }
+  xbee.readPacket();
+  if (xbee.getResponse().isAvailable()) {
+    if (xbee.getResponse().getApiId() == MODEM_STATUS_RESPONSE) {
+      xbee.getResponse().getModemStatusResponse(msr);
+      if (msr.getStatus() == ASSOCIATED)
+        xbee.send(zbIntroTx);
     }
-    serialStrComplete = false;
-    serialStr = "";
   }
 
   now = millis();
@@ -44,6 +46,9 @@ void loop() {
     Vout = analogRead(thermPin) / 1024.0 * 5;
     Rth = (50000 - 10000 * Vout) / Vout;
     temp = 1 / (0.001129148 + 0.000234125 * log(Rth) + 8.76741E-08 * pow(log(Rth), 3)) - 273.15;
-    Serial.println(String(deviceID + "," + String(temp,1)));
+    char tempArr[4];
+    String(temp,1).toCharArray(tempArr,5);
+    memcpy(dataPayload, tempArr, 5);
+    xbee.send(zbDataTx);
   }
 }
