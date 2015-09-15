@@ -30,6 +30,7 @@ serialPort.list(function(err, ports) {
             var C = xbee_api.constants;
             var databaseConnected = false;
             var mqttConnected = false;
+            var database = null;
 
             console.log('Connecting to database server');
             MongoClient.connect(mongoURL, function(err, db) {
@@ -37,6 +38,7 @@ serialPort.list(function(err, ports) {
                 else {
                     console.log('Connected to database server');
                     databaseConnected = true;
+                    database = db;
                 }
             });
 
@@ -49,7 +51,7 @@ serialPort.list(function(err, ports) {
 
             xbeeAPI.on('frame_object', function(frame) {
                 data = buildDocument(frame);
-                if (databaseConnected) insertDocument(data, db, 'temperature');
+                if (databaseConnected) insertDocument(data, database, 'temperature');
                 if (mqttConnected) publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
                 if (!databaseConnected && !mqttConnected) console.log('<<', frame);
             });
@@ -78,7 +80,7 @@ function buildDocument(APIframe) {
 function insertDocument(doc, db, collect) {
     db.collection(collect).insertOne(doc, function(err, result) {
         if (err) console.log('Error in inserting document')
-        else console.log('Inserted ' + result.insertCount + ' documents in collection');
+        else console.log('Inserted 1 documents in collection');
     });
 }
 
