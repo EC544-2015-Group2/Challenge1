@@ -111,6 +111,9 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
         if (mqttConnected) publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
         if (!databaseConnected && !mqttConnected) console.log('<<', frame);
     });
+    xbeeAPI.on('error', function(err){
+        console.log(err);
+    })
 });
 
 // Given a frame, create a structured object/document to insert into the database
