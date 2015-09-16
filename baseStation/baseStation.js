@@ -118,6 +118,9 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
 
         }
     });
+    xbeeAPI.on('error', function(err) {
+        console.log(err);
+    })
     Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, '4000')));
     Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_SYNC)));
 });
