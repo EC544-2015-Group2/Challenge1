@@ -105,15 +105,10 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
     // This attaches a asynchronous callback function to a 'frame_object' event that gets called when the xbeeAPI object parses a complete API frame on the serial port. The callback is called with the frame as an argument.
     xbeeAPI.on('frame_object', function(frame) {
         if (frame.type === C.FRAME_TYPE.ZIGBEE_RECEIVE_PACKET) {
-            if (frame.data[0] === SET_HEARTBEAT) {
-                // Update list of active nodes
-                console.log('Received heartbeat from address64: ' + frame.address64);
-            } else {
-                data = buildDocument(frame);
-                if (databaseConnected) insertDocument(data, database, 'temperature');
-                if (mqttConnected) publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
-                if (!databaseConnected && !mqttConnected) console.log('<<', frame);
-            }
+            data = buildDocument(frame);
+            if (databaseConnected) insertDocument(data, database, 'temperature');
+            if (mqttConnected) publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
+            if (!databaseConnected && !mqttConnected) console.log('<<', frame);
         }
     });
     xbeeAPI.on('error', function(err) {
@@ -167,7 +162,6 @@ function buildFrameObject(command) {
                 return char.charCodeAt(0);
             }));
             dataPayload.push(0x00);
-            console.log(dataPayload);
             break;
         case SET_HEARTBEAT:
             dataPayload = [0xB2];
