@@ -87,16 +87,14 @@ void loop() {
           break;
         case SET_HEARTBEAT:
           // Check first byte for heartbeat request and send back heartbeat
-          dataPayload[0] = SET_HEARTBEAT;
+          String(measureTemperature(), 1).toCharArray((char*)((void*)dataPayload), 5);
           xbee.send(zbDataTx);
           break;
         case SET_PERIOD:
           // Get pointer to data payload, increment it to discard first byte (command byte), cast it to (char*) and find out what number it contains using atoi() (e.g. atoi('1000') returns integer 1000)
           period = atoi((char*)++rxPayload);
           break;
-
       }
-
     }
   }
 
@@ -106,13 +104,17 @@ void loop() {
   if ((now - timestamp) > period || sync) {
     timestamp = now;
     sync = false;
-    // Calculate Vout from Vin and ADC resolution, then calculate Rth from voltage-divider equation and finally use Steinhart-Hart equation to map thermistor resistance to sensed temperature
-    Vout = analogRead(thermPin) / 1024.0 * 5;
-    Rth = (50000 - 10000 * Vout) / Vout;
-    temp = 1 / (0.001129148 + 0.000234125 * log(Rth) + 8.76741E-08 * pow(log(Rth), 3)) - 273.15;
 
     //  Generate string of temperature to 1 decimal place and copy its chars to the data payload memory address (the void* cast is required to go from uint8_t* to char*), then generate API frame and output through serial port
-    String(temp, 1).toCharArray((char*)((void*)dataPayload), 5);
+    String(measureTemperature(), 1).toCharArray((char*)((void*)dataPayload), 5);
     xbee.send(zbDataTx);
   }
+}
+
+float measureTemperature() {
+  // Calculate Vout from Vin and ADC resolution, then calculate Rth from voltage-divider equation and finally use Steinhart-Hart equation to map thermistor resistance to sensed temperature
+  Vout = analogRead(thermPin) / 1024.0 * 5;
+  Rth = (50000 - 10000 * Vout) / Vout;
+  temp = 1 / (0.001129148 + 0.000234125 * log(Rth) + 8.76741E-08 * pow(log(Rth), 3)) - 273.15;
+  return temp;
 }
