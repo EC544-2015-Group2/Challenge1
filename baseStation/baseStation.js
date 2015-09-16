@@ -44,8 +44,6 @@
 * substantial portions of the Software.
 */
 
-
-
 // Loads required NPM modules and makes them available in scope
 var xbee_api = require('xbee-api'),
     serialPort = require('serialport'),
@@ -58,9 +56,12 @@ var mongoURL = 'mongodb://localhost:27017/ZigBeeBaseStation',
 
 // IMPORTANT: Use api_mode: 2 as the xbee-arduino library requires it
 // Create the xbeeAPI object which handles parsing and generating of API frames
+// C contains some Xbee constant bytes such as frame type, transmit/receive options, etc.
+
 var xbeeOptions = {
         api_mode: 2
     },
+    C = xbee_api.constants,
     xbeeAPI = new xbee_api.XBeeAPI(xbeeOptions);
 
 // Serial port options
@@ -76,9 +77,6 @@ var portName = process.argv[2],
 // Create a serial port at the port name with the given serial options, open it immediately and call the callback function supplied
 var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately, function() {
     console.log('Opened serial port');
-
-    // These are some Xbee constant bytes such as frame type, transmit/receive options, etc.
-    var C = xbee_api.constants;
 
     // Additional optional functionality to dump data to a MongoDB instance/ MQTT server
     var databaseConnected = false,
@@ -106,11 +104,22 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
 
     // This attaches a asynchronous callback function to a 'frame_object' event that gets called when the xbeeAPI object parses a complete API frame on the serial port. The callback is called with the frame as an argument.
     xbeeAPI.on('frame_object', function(frame) {
-        data = buildDocument(frame);
-        if (databaseConnected) insertDocument(data, database, 'temperature');
-        if (mqttConnected) publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
-        if (!databaseConnected && !mqttConnected) console.log('<<', frame);
+        if (frame.type === C.FRAME_TYPE.ZIGBEE_RECEIVE_PACKET) {
+            if (frame.data[0] === SET_HEARTBEAT) {
+                // Update list of active nodes
+                console.log('Received heartbeat from address64: ' + frame.address64);
+            } else {
+                data = buildDocument(frame);
+                if (databaseConnected) insertDocument(data, database, 'temperature');
+                if (mqttConnected) publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
+                if (!databaseConnected && !mqttConnected) console.log('<<', frame);
+            }
+        } else if (frame.type === C.FRAME_TYPE.ZIGBEE_TRANSMIT_STATUS) {
+
+        }
     });
+    Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, '4000')));
+    Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_SYNC)));
 });
 
 // Given a frame, create a structured object/document to insert into the database
@@ -135,4 +144,35 @@ function publishMQTT(doc, mqttClient, topic) {
     mqttClient.publish(topic, JSON.stringify(doc), function() {
         console.log('Published MQTT message to topic: ' + topic);
     });
+}
+
+var SET_SYNC = 0xB0,
+    SET_PERIOD = 0xB1,
+    SET_HEARTBEAT = 0xB2;
+
+function buildFrameObject(command) {
+    var frameObject = {
+        type: C.FRAME_TYPE.ZIGBEE_TRANSMIT_REQUEST,
+        destination64: '000000000000ffff'
+    }
+    switch (command) {
+        case SET_SYNC:
+            var dataPayload = [0xB0];
+            break;
+        case SET_PERIOD:
+            var dataPayload = [0xB1];
+            if (arguments.length < 2) throw 'FRAME_COMMAND_ERROR: Specify period string in milliseconds';
+            dataPayload.push.apply(dataPayload, arguments[1].split('').map(function(char) {
+                return char.charCodeAt(0);
+            }));
+            dataPayload.push(0x00);
+            console.log(dataPayload);
+            break;
+        case SET_HEARTBEAT:
+            dataPayload = [0xB2];
+        default:
+            throw 'FRAME_COMMAND_ERROR: Invalid command issued to buildFrameObject(command)'
+    }
+    frameObject.data = dataPayload;
+    return frameObject;
 }
