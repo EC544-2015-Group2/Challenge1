@@ -104,15 +104,31 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
         mqttConnected = true;
     });
 
+    // Temporary variables for calculating average temperature
+    var timestamp = Date.now();
+    var readingsList = [];
     // This attaches a asynchronous callback function to a 'frame_object' event that gets called when the xbeeAPI object parses a complete API frame on the serial port. The callback is called with the frame as an argument.
     xbeeAPI.on('frame_object', function(frame) {
         data = buildDocument(frame);
+
+        // If readings are within a cluster of 500 ms, then add it to list of readings, else calculate average and empty the list. The timestamp variable is used to identify cluster of readings
+        if (Date.now() - timestamp > 500) {
+            timestamp = Date.now();
+            if (readingsList.length > 0)
+                console.log('Average temperature: ' + readingsList.reduce(function(a, b) {
+                    return a + b;
+                }) / readingsList.length);
+            readingsList = [];
+            readingsList.push(data.value);
+        } else readingsList.push(data.value);
+
+        
         if (databaseConnected) insertDocument(data, database, 'temperature');
         if (mqttConnected) publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
         if (!databaseConnected && !mqttConnected) console.log('<<', frame);
     });
-    xbeeAPI.on('error', function(err){
-        console.log(err);
+    xbeeAPI.on('error', function(err) {
+        console.log('Checksum mismatch error');
     })
 });
 
