@@ -52,16 +52,6 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
     });
 });
 
-function portnameFilter(port) {
-    if (port.comName.match('/dev/cu.u')) {
-        return true;
-    } else return false;
-};
-
-function getPortName(portList, index) {
-    return portList[index].comName.replace('cu', 'tty');
-}
-
 function buildDocument(APIframe) {
     return {
         deviceID: APIframe.remote64,
