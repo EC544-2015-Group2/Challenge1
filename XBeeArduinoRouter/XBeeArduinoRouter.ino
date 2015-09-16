@@ -97,9 +97,9 @@ void loop() {
 
   // Get current clock time in ms and refresh sensor reading if either time period has elapsed or if synchronize command has been received
   now = millis();
-  sync = false;
   if ((now - timestamp) > period || sync) {
     timestamp = now;
+    sync = false;
 
     // Calculate Vout from Vin and ADC resolution, then calculate Rth from voltage-divider equation and finally use Steinhart-Hart equation to map thermistor resistance to sensed temperature
     Vout = analogRead(thermPin) / 1024.0 * 5;
