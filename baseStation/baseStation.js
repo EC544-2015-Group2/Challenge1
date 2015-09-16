@@ -114,8 +114,6 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
                 if (mqttConnected) publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
                 if (!databaseConnected && !mqttConnected) console.log('<<', frame);
             }
-        } else if (frame.type === C.FRAME_TYPE.ZIGBEE_TRANSMIT_STATUS) {
-
         }
     });
     xbeeAPI.on('error', function(err) {
