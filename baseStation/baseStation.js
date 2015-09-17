@@ -77,6 +77,7 @@ var portName = process.argv[2],
 // Create a serial port at the port name with the given serial options, open it immediately and call the callback function supplied
 var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately, function() {
     console.log('Opened serial port');
+    Serial.flush();
 
     // Additional optional functionality to dump data to a MongoDB instance/ MQTT server
     var databaseConnected = false,
@@ -111,15 +112,19 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
             data = buildDocument(frame);
 
             // If readings are within a cluster of 500 ms, then add it to list of readings, else calculate average and empty the list. The timestamp variable is used to identify cluster of readings
-            if (Date.now() - timestamp > 500) {
+            if (Date.now() - timestamp > 1000) {
                 timestamp = Date.now();
-                if (readingsList.length > 0)
-                    console.log('Average temperature: ' + readingsList.reduce(function(a, b) {
+                if (readingsList.length > 0) {
+                    var avg = readingsList.reduce(function(a, b) {
                         return a + b;
-                    }) / readingsList.length);
-                readingsList = [];
-                readingsList.push(data.value);
-            } else readingsList.push(data.value);
+                    }) / readingsList.length
+                    if (readingsList.length == 4)
+                        console.log('[' + readingsList + ']     ' + 'Average: ' + avg.toFixed(2));
+                    else Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_SYNC)));
+                    readingsList = [];
+                }
+                if (data.value) readingsList.push(data.value);
+            } else if (data.value) readingsList.push(data.value);
 
 
             if (databaseConnected) insertDocument(data, database, 'temperature');
@@ -130,7 +135,8 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
     xbeeAPI.on('error', function(err) {
         console.log('Checksum mismatch error');
 
-    })
+    });
+    Serial.flush();
     Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, '4000')));
     Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_SYNC)));
 });
@@ -148,14 +154,14 @@ function buildDocument(APIframe) {
 function insertDocument(doc, db, collect) {
     db.collection(collect).insertOne(doc, function(err, result) {
         if (err) console.log('Error in inserting document')
-        else console.log('Inserted 1 documents in collection');
+            // else console.log('Inserted 1 documents in collection');
     });
 }
 
 // Publish JSON stringified payload to MQTT server at supplied topic
 function publishMQTT(doc, mqttClient, topic) {
     mqttClient.publish(topic, JSON.stringify(doc), function() {
-        console.log('Published MQTT message to topic: ' + topic);
+        // console.log('Published MQTT message to topic: ' + topic);
     });
 }
 
