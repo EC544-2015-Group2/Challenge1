@@ -50,9 +50,6 @@ const uint8_t SET_SYNC = 0xB0;
 const uint8_t SET_PERIOD = 0xB1;
 const uint8_t SET_HEARTBEAT = 0xB2;
 
-// Sensed voltage, calculated thermistor resistance, and calculated temperature
-double Vout, Rth, temp;
-
 // Timing variables
 unsigned long timestamp = 0, now, period = 1000;
 
@@ -72,6 +69,9 @@ void setup() {
 }
 
 void loop() {
+  
+  // Get current clock time in ms and refresh sensor reading if either time period has elapsed or if synchronize command has been received
+  now = millis();
 
   // Read the serial buffer for a complete API frame and if one is available, check if it is of type data received. If it is, then parse it's properties such as source address, data payload, etc.
   xbee.readPacket();
@@ -83,23 +83,16 @@ void loop() {
       // See the first byte of the data payload to see what command is transmitted
       switch (rx.getData(0)) {
         case SET_SYNC:
-          sync = true;    // Set the sync flag to force reading update
-          break;
-        case SET_HEARTBEAT:
-          // Check first byte for heartbeat request and send back heartbeat
-          String(measureTemperature(), 1).toCharArray((char*)((void*)dataPayload), 5);
-          xbee.send(zbDataTx);
+          sync = true;
           break;
         case SET_PERIOD:
           // Get pointer to data payload, increment it to discard first byte (command byte), cast it to (char*) and find out what number it contains using atoi() (e.g. atoi('1000') returns integer 1000)
           period = atoi((char*)++rxPayload);
+          timestamp = now;
           break;
       }
     }
   }
-
-  // Get current clock time in ms and refresh sensor reading if either time period has elapsed or if synchronize command has been received
-  now = millis();
 
   if ((now - timestamp) > period || sync) {
     timestamp = now;
@@ -109,12 +102,14 @@ void loop() {
     String(measureTemperature(), 1).toCharArray((char*)((void*)dataPayload), 5);
     xbee.send(zbDataTx);
   }
+
+  // Now sleep for 900 ms.
 }
 
 float measureTemperature() {
   // Calculate Vout from Vin and ADC resolution, then calculate Rth from voltage-divider equation and finally use Steinhart-Hart equation to map thermistor resistance to sensed temperature
-  Vout = analogRead(thermPin) / 1024.0 * 5;
-  Rth = (50000 - 10000 * Vout) / Vout;
-  temp = 1 / (0.001129148 + 0.000234125 * log(Rth) + 8.76741E-08 * pow(log(Rth), 3)) - 273.15;
+  double Vout = analogRead(thermPin) / 1024.0 * 5;
+  double Rth = (50000 - 10000 * Vout) / Vout;
+  double temp = 1 / (0.001129148 + 0.000234125 * log(Rth) + 8.76741E-08 * pow(log(Rth), 3)) - 273.15;
   return temp;
 }
