@@ -47,11 +47,9 @@
 // Loads required NPM modules and makes them available in scope
 var xbee_api = require('xbee-api'),
     serialPort = require('serialport'),
-    MongoClient = require('mongodb').MongoClient,
     mqtt = require('mqtt');
 
-var mongoURL = 'mongodb://localhost:27017/ZigBeeBaseStation',
-    mqttURL = 'mqtt://broker.mqtt-dashboard.com',
+var mqttURL = 'mqtt://broker.mqtt-dashboard.com',
     mqttTopicPrefix = 'EC544-Group2-Challenge1/temperature/';
 
 // IMPORTANT: Use api_mode: 2 as the xbee-arduino library requires it
@@ -78,79 +76,48 @@ var portName = process.argv[2],
 var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately, function() {
     console.log('Opened serial port');
 
-    // Additional optional functionality to dump data to a MongoDB instance/ MQTT server
-    var databaseConnected = false,
-        mqttConnected = false,
-        database = null;
-
-    // Check if you have a mongod instance running on mongoURL and if you can connect to it
-    console.log('Connecting to database server');
-    MongoClient.connect(mongoURL, function(err, db) {
-        if (err) console.log('Failed to connect to database server. Proceeding without database ....');
-        else {
-            console.log('Connected to database server');
-            databaseConnected = true;
-            database = db;
-        }
-    });
-
     // Check if the MQTT broker at mqttURL is accepting incoming connections
     var mqttClient = mqtt.connect(mqttURL);
     console.log('Connecting to MQTT server');
     mqttClient.on('connect', function() {
         console.log('Connected to MQTT server');
-        mqttConnected = true;
+
+        var devicesConnected = [];
+        // Temporary variables for calculating average temperature
+        var readingsList = {
+            time: Date.now()
+        };
+        // This attaches a asynchronous callback function to a 'frame_object' event that gets called when the xbeeAPI object parses a complete API frame on the serial port. The callback is called with the frame as an argument.
+        xbeeAPI.on('frame_object', function(frame) {
+            if (frame.type === C.FRAME_TYPE.ZIGBEE_RECEIVE_PACKET) {
+                data = buildDocument(frame);
+
+                // If readings are within a cluster of 500 ms, then add it to list of readings, else calculate average and empty the list. The timestamp variable is used to identify cluster of readings
+                if (Date.now() - timestamp > 500) {
+                    timestamp = Date.now();
+                    if (readingsList.length > 0)
+                        console.log('Average temperature: ' + readingsList.reduce(function(a, b) {
+                            return a + b;
+                        }) / readingsList.length);
+                    readingsList = [];
+                    readingsList.push(data.value);
+                } else readingsList.push(data.value);
+
+
+                if (databaseConnected) insertDocument(data, database, 'temperature');
+                if (mqttConnected) publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
+                if (!databaseConnected && !mqttConnected) console.log('<<', frame);
+            } else if (frame.type === C.FRAME_TYPE.NODE_IDENTIFICATION) {
+
+            }
+        });
+        xbeeAPI.on('error', function(err) {
+            console.log('Checksum mismatch error');
+        });
+        Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, '4000')));
+        Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_SYNC)));
     });
-
-    // Temporary variables for calculating average temperature
-    var timestamp = Date.now();
-    var readingsList = [];
-    // This attaches a asynchronous callback function to a 'frame_object' event that gets called when the xbeeAPI object parses a complete API frame on the serial port. The callback is called with the frame as an argument.
-    xbeeAPI.on('frame_object', function(frame) {
-        if (frame.type === C.FRAME_TYPE.ZIGBEE_RECEIVE_PACKET) {
-            data = buildDocument(frame);
-
-            // If readings are within a cluster of 500 ms, then add it to list of readings, else calculate average and empty the list. The timestamp variable is used to identify cluster of readings
-            if (Date.now() - timestamp > 500) {
-                timestamp = Date.now();
-                if (readingsList.length > 0)
-                    console.log('Average temperature: ' + readingsList.reduce(function(a, b) {
-                        return a + b;
-                    }) / readingsList.length);
-                readingsList = [];
-                readingsList.push(data.value);
-            } else readingsList.push(data.value);
-
-
-            if (databaseConnected) insertDocument(data, database, 'temperature');
-            if (mqttConnected) publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
-            if (!databaseConnected && !mqttConnected) console.log('<<', frame);
-        }
-    });
-    xbeeAPI.on('error', function(err) {
-        console.log('Checksum mismatch error');
-
-    })
-    Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, '4000')));
-    Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_SYNC)));
 });
-
-// Given a frame, create a structured object/document to insert into the database
-function buildDocument(APIframe) {
-    return {
-        deviceID: APIframe.remote64,
-        time: Date.now(),
-        value: parseFloat(APIframe.data.toString('ascii'))
-    };
-}
-
-// Insert document into specified collection in given database and report status
-function insertDocument(doc, db, collect) {
-    db.collection(collect).insertOne(doc, function(err, result) {
-        if (err) console.log('Error in inserting document')
-        else console.log('Inserted 1 documents in collection');
-    });
-}
 
 // Publish JSON stringified payload to MQTT server at supplied topic
 function publishMQTT(doc, mqttClient, topic) {
