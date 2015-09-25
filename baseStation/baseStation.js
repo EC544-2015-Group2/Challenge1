@@ -81,35 +81,33 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
     console.log('Connecting to MQTT server');
     mqttClient.on('connect', function() {
         console.log('Connected to MQTT server');
-
+		// Variable for keeping track of the number of devices connected. Must have devices check in above.
         var devicesConnected = [];
         // Temporary variables for calculating average temperature
-        var readingsList = {
-            time: Date.now()
-        };
+        var readingsList = null;
+		// Temporary variable to keep track of timeouts
+		var timestamp = 0;
         // This attaches a asynchronous callback function to a 'frame_object' event that gets called when the xbeeAPI object parses a complete API frame on the serial port. The callback is called with the frame as an argument.
         xbeeAPI.on('frame_object', function(frame) {
-            if (frame.type === C.FRAME_TYPE.ZIGBEE_RECEIVE_PACKET) {
-                data = buildDocument(frame);
-
-                // If readings are within a cluster of 500 ms, then add it to list of readings, else calculate average and empty the list. The timestamp variable is used to identify cluster of readings
-                if (Date.now() - timestamp > 500) {
-                    timestamp = Date.now();
-                    if (readingsList.length > 0)
-                        console.log('Average temperature: ' + readingsList.reduce(function(a, b) {
-                            return a + b;
-                        }) / readingsList.length);
-                    readingsList = [];
-                    readingsList.push(data.value);
-                } else readingsList.push(data.value);
-
-
-                if (databaseConnected) insertDocument(data, database, 'temperature');
-                if (mqttConnected) publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
-                if (!databaseConnected && !mqttConnected) console.log('<<', frame);
-            } else if (frame.type === C.FRAME_TYPE.NODE_IDENTIFICATION) {
-
-            }
+			timestamp = millis();
+            if (frame.type === C.FRAME_TYPE.ZIGBEE_RECEIVE_PACKET) {   
+				timestamp = millis();
+                if (!readingsList) {
+                	readingsList = {
+					time: Date.now(),
+					temp: []
+					};
+                };	
+				readingsList.temp.push({deviceID: frame.remote64, data: parseFloat(frame.data.toString('ascii'));
+				});
+				if (readingList.temp.length === devicesConnected.length) {
+					publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
+					readingsList = null;
+				} else if (millis() - timestamp > 5000) {
+					publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
+					readingsList = null;
+				};
+            } //else if (frame.type === C.FRAME_TYPE.NODE_IDENTIFICATION) {}
         });
         xbeeAPI.on('error', function(err) {
             console.log('Checksum mismatch error');
