@@ -77,7 +77,7 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
 		var deviceList = [];
 		
 		// Create timer variables to keep track of time during periods
-		var timestamp = null;
+		var timestamp = null; // change to date.now()
 		var remainingPeriod = 15000;
 
         // This attaches a asynchronous callback function to a 'frame_object' event that gets called when the xbeeAPI object parses a complete API frame on the serial port. The callback is called with the frame as an argument.
@@ -111,7 +111,7 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
 							console.log('ERROR: One or more devices has not sent data!')
 						};
 						deviceList = readingsList.temperatures.map(function (item) {
-							return item.deviceID
+							return item.deviceID;
 						});
 						readingsList = null;
                     }, 5000);
