@@ -71,11 +71,26 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
     var mqttClient = mqtt.connect(mqttURL);
     mqttClient.on('connect', function() {
         console.log('Connected to MQTT server');
-
-        var readingsList;
+		
+		// Create variables to store device IDs and data
+        var readingsList = null;
+		var deviceList = [];
+		
+		// Create timer variables to keep track of time during periods
+		var timestamp = null;
+		var remainingPeriod = 15000;
 
         // This attaches a asynchronous callback function to a 'frame_object' event that gets called when the xbeeAPI object parses a complete API frame on the serial port. The callback is called with the frame as an argument.
         xbeeAPI.on('frame_object', function(frame) {
+			if (frame.type === C.FRAME_TYPE.NODE_IDENTIFICATION) {
+				deviceList.push(frame.remote64);
+				if (!timestamp) {
+					Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, 15000)));
+				} else {
+					remainingPeriod = 15000 - (Date.now() - timestamp);
+					Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, remainingPeriod)));
+				};
+			};
             if (frame.type === C.FRAME_TYPE.ZIGBEE_RECEIVE_PACKET) {
                 if (!readingsList) {
                     readingsList = {
@@ -87,8 +102,18 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
                             return a.deviceID - b.deviceID;
                         });
                         mqttClient.publish(mqttTopic, JSON.stringify(readingsList));
-                        readingsList = null;
-                        Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, '15000')));
+						Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, '15000')));
+						timestamp = Date.now();
+						
+						if (readingsList.temperatures.length > deviceList.length) { 
+							console.log('ERROR: Extra device found! Temperature data included and sent.');
+						} else if (readingsList.temperature.length < deviceList.length) {
+							console.log('ERROR: One or more devices has not sent data!')
+						};
+						deviceList = readingsList.temperatures.map(function (item) {
+							return item.deviceID
+						});
+						readingsList = null;
                     }, 5000);
                 }
                 readingsList.temperatures.push({
