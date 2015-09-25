@@ -51,7 +51,7 @@ const uint8_t SET_PERIOD = 0xB1;
 const uint8_t SET_HEARTBEAT = 0xB2;
 
 // Timing variables
-unsigned long timestamp = 0, now, period = 1000;
+unsigned long timestamp = 0, now, period = 15000;
 
 boolean sync = false;   // Flag for forcing sense reading to synchronize Arduinos
 uint8_t dataPayload[5];   // Preallocated memory location for sending in transmit API frame

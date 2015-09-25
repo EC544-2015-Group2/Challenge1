@@ -18,16 +18,10 @@
 * publish stringified JSON at the supplied topic URL. If neither database nor mqtt are available,
 * just log the object to console.
 *
-*                                        mongodb
-*                                           |
-*                                           ~
-*                                           |
-* XBEE ----serialport-----xbee-api----------|------ console.log
-*                                           |
-*                                           ~
-*                                           |
-*                                          mqtt
-
+*
+* XBEE -----> serialport -----> xbee-api ------> mqtt
+*
+*
 * IMPORTANT: All XBees should be configured in API mode 2 (escaped mode) as the xbee-arduino library
 * requires this mode
 *
@@ -75,60 +69,45 @@ var portName = process.argv[2],
 // Create a serial port at the port name with the given serial options, open it immediately and call the callback function supplied
 var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately, function() {
     console.log('Opened serial port');
+    Serial.flush();
 
     // Check if the MQTT broker at mqttURL is accepting incoming connections
     var mqttClient = mqtt.connect(mqttURL);
-    console.log('Connecting to MQTT server');
     mqttClient.on('connect', function() {
         console.log('Connected to MQTT server');
 
-        var devicesConnected = [];
-        // Temporary variables for calculating average temperature
-        var readingsList = {
-            time: Date.now()
-        };
+        var readingsList;
+
         // This attaches a asynchronous callback function to a 'frame_object' event that gets called when the xbeeAPI object parses a complete API frame on the serial port. The callback is called with the frame as an argument.
         xbeeAPI.on('frame_object', function(frame) {
             if (frame.type === C.FRAME_TYPE.ZIGBEE_RECEIVE_PACKET) {
-                data = buildDocument(frame);
-
-                // If readings are within a cluster of 500 ms, then add it to list of readings, else calculate average and empty the list. The timestamp variable is used to identify cluster of readings
-                if (Date.now() - timestamp > 500) {
-                    timestamp = Date.now();
-                    if (readingsList.length > 0)
-                        console.log('Average temperature: ' + readingsList.reduce(function(a, b) {
-                            return a + b;
-                        }) / readingsList.length);
-                    readingsList = [];
-                    readingsList.push(data.value);
-                } else readingsList.push(data.value);
-
-
-                if (databaseConnected) insertDocument(data, database, 'temperature');
-                if (mqttConnected) publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
-                if (!databaseConnected && !mqttConnected) console.log('<<', frame);
-            } else if (frame.type === C.FRAME_TYPE.NODE_IDENTIFICATION) {
-
+                if (!readingsList) {
+                    readingsList = {
+                        time: Date.now(),
+                        temperatures: []
+                    };
+                    setTimeout(function() {
+                        mqttClient.publish(topic, JSON.stringify(readingsList));
+                        readingsList = null;
+                        Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, '15000')))
+                    }, 5000);
+                }
+                readingsList.temperatures.push({
+                    deviceID: frame.remote64,
+                    value: parseFloat(frame.data.toString('ascii'))
+                });
             }
         });
         xbeeAPI.on('error', function(err) {
             console.log('Checksum mismatch error');
         });
-        Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, '4000')));
+        Serial.flush();
         Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_SYNC)));
     });
 });
 
-// Publish JSON stringified payload to MQTT server at supplied topic
-function publishMQTT(doc, mqttClient, topic) {
-    mqttClient.publish(topic, JSON.stringify(doc), function() {
-        console.log('Published MQTT message to topic: ' + topic);
-    });
-}
-
 var SET_SYNC = 0xB0,
-    SET_PERIOD = 0xB1,
-    SET_HEARTBEAT = 0xB2;
+    SET_PERIOD = 0xB1;
 
 function buildFrameObject(command) {
     var frameObject = {
@@ -147,8 +126,6 @@ function buildFrameObject(command) {
             }));
             dataPayload.push(0x00);
             break;
-        case SET_HEARTBEAT:
-            dataPayload = [0xB2];
         default:
             throw 'FRAME_COMMAND_ERROR: Invalid command issued to buildFrameObject(command)'
     }
