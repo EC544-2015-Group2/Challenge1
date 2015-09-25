@@ -101,10 +101,10 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
 				readingsList.temp.push({deviceID: frame.remote64, data: parseFloat(frame.data.toString('ascii'));
 				});
 				if (readingList.temp.length === devicesConnected.length) {
-					publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
+					publishMQTT(topic, JSON.stringify(readingList));
 					readingsList = null;
 				} else if (millis() - timestamp > 5000) {
-					publishMQTT(data, mqttClient, mqttTopicPrefix + data.deviceID);
+					publishMQTT(topic, JSON.stringify(readingList));
 					readingsList = null;
 				};
             } //else if (frame.type === C.FRAME_TYPE.NODE_IDENTIFICATION) {}
