@@ -1,42 +1,38 @@
 /*
-* This is part of the challenge 1 in EC544 at Boston University in Fall 2015 done by group 2
-* consisting of the following members
-* 1) Gaurav Hirlekar
-* 2) Reeve Hicks
-* 3) Xin Peng
-* 4) Ye Liu
-* 5) Hao Wu
-*
-*
-* This is the NodeJS program running on a base station to which is connected the Xbee
-* coordinator through an Xbee explorer dongle. This program talks to it through the 'serialport'
-* library, using the 'xbee-api' library to handle the input/output buffer, validate incoming API frames,
-* call events, and parse the API frames.
-*
-* Optionally, if a mongoDB server is accepting connections at the supplied URL, insert objects/documents
-* into a 'temperature' collection. Also, if a MQTT server is accepting connections at the supplied URL,
-* publish stringified JSON at the supplied topic URL. If neither database nor mqtt are available,
-* just log the object to console.
-*
-*
-* XBEE -----> serialport -----> xbee-api ------> mqtt
-*
-*
-* IMPORTANT: All XBees should be configured in API mode 2 (escaped mode) as the xbee-arduino library
-* requires this mode
-*
-*
-*
-*
-* MIT LICENSE
-* Permission is hereby granted, free of charge, to any person obtaining a copy of this software
-* and associated documentation files (the “Software”), to deal in the Software without restriction,
-* including without limitation the rights to use, copy, modify, merge, publish, distribute,
-* sublicense, and/or sell copies of the Software, and to permit persons to whom the Software
-* is furnished to do so, subject to the following conditions:
-* The above copyright notice and this permission notice shall be included in all copies or
-* substantial portions of the Software.
-*/
+ * This is part of the challenge 1 in EC544 at Boston University in Fall 2015 done by group 2
+ * consisting of the following members
+ * 1) Gaurav Hirlekar
+ * 2) Reeve Hicks
+ * 3) Xin Peng
+ * 4) Ye Liu
+ * 5) Hao Wu
+ *
+ *
+ * This is the NodeJS program running on a base station to which is connected the Xbee
+ * coordinator through an Xbee explorer dongle. This program talks to it through the 'serialport'
+ * library, using the 'xbee-api' library to handle the input/output buffer, validate incoming API frames,
+ * call events, and parse the API frames. The program then aggregates readings arriving in a small interval
+ * into one document and publishes the JSON at the supplied topic URL. 
+ *
+ *
+ * XBEE -----> serialport -----> xbee-api ------> mqtt
+ *
+ *
+ * IMPORTANT: All XBees should be configured in API mode 2 (escaped mode) as the xbee-arduino library
+ * requires this mode
+ *
+ *
+ *
+ *
+ * MIT LICENSE
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+ * and associated documentation files (the “Software”), to deal in the Software without restriction,
+ * including without limitation the rights to use, copy, modify, merge, publish, distribute,
+ * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software
+ * is furnished to do so, subject to the following conditions:
+ * The above copyright notice and this permission notice shall be included in all copies or
+ * substantial portions of the Software.
+ */
 
 // Loads required NPM modules and makes them available in scope
 var xbee_api = require('xbee-api'),
@@ -44,7 +40,7 @@ var xbee_api = require('xbee-api'),
     mqtt = require('mqtt');
 
 var mqttURL = 'mqtt://broker.mqtt-dashboard.com',
-    mqttTopicPrefix = 'EC544-Group2-Challenge1/temperature/';
+    mqttTopic = 'EC544-Group2-Challenge1/temperature/';
 
 // IMPORTANT: Use api_mode: 2 as the xbee-arduino library requires it
 // Create the xbeeAPI object which handles parsing and generating of API frames
@@ -87,9 +83,12 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
                         temperatures: []
                     };
                     setTimeout(function() {
-                        mqttClient.publish(topic, JSON.stringify(readingsList));
+                        readingsList.temperatures = readingsList.temperatures.sort(function(a, b) {
+                            return a.deviceID - b.deviceID;
+                        });
+                        mqttClient.publish(mqttTopic, JSON.stringify(readingsList));
                         readingsList = null;
-                        Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, '15000')))
+                        Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, '15000')));
                     }, 5000);
                 }
                 readingsList.temperatures.push({
