@@ -113,15 +113,14 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
                 }
                 readingsList.temperatures.push({
                     deviceID: frame.remote64,
-                    value: parseFloat(frame.data.toString('ascii')).toFixed(2)
+                    value: parseFloat(frame.data.toString('ascii'));
                 });
             }
         });
         xbeeAPI.on('error', function(err) {
-            console.log('Checksum mismatch error');
+            console.log('ERROR: Xbee API Checksum mismatch');
         });
         Serial.flush();
-        Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_SYNC)));
     });
 });
 
