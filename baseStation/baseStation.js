@@ -77,18 +77,15 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
 		var deviceList = [];
 		
 		// Create timer variables to keep track of time during periods
-		var timestamp = null; // change to date.now()
+		var timestamp = date.now(); // change to date.now()
 		var remainingPeriod = 15000;
 
         // This attaches a asynchronous callback function to a 'frame_object' event that gets called when the xbeeAPI object parses a complete API frame on the serial port. The callback is called with the frame as an argument.
         xbeeAPI.on('frame_object', function(frame) {
 			if (frame.type === C.FRAME_TYPE.NODE_IDENTIFICATION) {
 				deviceList.push(frame.remote64);
-				if (!timestamp) {
-					Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, 15000)));
-				} else {
-					remainingPeriod = 15000 - (Date.now() - timestamp);
-					Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, remainingPeriod)));
+				remainingPeriod = 15000 - (Date.now() - timestamp);
+				Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, remainingPeriod)));
 				};
 			};
             if (frame.type === C.FRAME_TYPE.ZIGBEE_RECEIVE_PACKET) {
