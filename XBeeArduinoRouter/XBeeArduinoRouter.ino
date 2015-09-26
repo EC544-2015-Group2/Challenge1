@@ -51,7 +51,7 @@ const uint8_t SET_PERIOD = 0xB1;
 const uint8_t SET_HEARTBEAT = 0xB2;
 
 // Timing variables
-unsigned long timestamp = 0, now, period = 15000;
+unsigned long timestamp = 0, now, period = 4294967295; // longest time possible (4bytes)
 
 boolean sync = false;   // Flag for forcing sense reading to synchronize Arduinos
 uint8_t dataPayload[5];   // Preallocated memory location for sending in transmit API frame
@@ -72,6 +72,7 @@ void loop() {
   
   // Get current clock time in ms and refresh sensor reading if either time period has elapsed or if synchronize command has been received
   now = millis();
+  
 
   // Read the serial buffer for a complete API frame and if one is available, check if it is of type data received. If it is, then parse it's properties such as source address, data payload, etc.
   xbee.readPacket();
