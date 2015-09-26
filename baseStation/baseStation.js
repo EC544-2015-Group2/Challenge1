@@ -83,9 +83,7 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
                         temperatures: []
                     };
                     setTimeout(function() {
-                        readingsList.temperatures = readingsList.temperatures.sort(function(a, b) {
-                            return a.deviceID - b.deviceID;
-                        });
+                        readingsList.temperatures = readingsList.temperatures.sort();
                         mqttClient.publish(mqttTopic, JSON.stringify(readingsList));
                         readingsList = null;
                         Serial.write(xbeeAPI.buildFrame(buildFrameObject(SET_PERIOD, '15000')));
@@ -93,7 +91,7 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
                 }
                 readingsList.temperatures.push({
                     deviceID: frame.remote64,
-                    value: parseFloat(frame.data.toString('ascii'))
+                    value: parseFloat(frame.data.toString('ascii')).toFixed(2)
                 });
             }
         });
