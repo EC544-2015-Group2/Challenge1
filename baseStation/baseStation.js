@@ -39,8 +39,8 @@ var xbee_api = require('xbee-api'),
     serialPort = require('serialport'),
     mqtt = require('mqtt');
 
-var mqttURL = 'mqtt://broker.mqtt-dashboard.com',
-    mqttTopic = 'EC544-Group2-Challenge1/temperature/';
+var mqttURL = 'mqtt://broker.mqttdashboard.com',
+    mqttTopic = 'EC544Group2_Challenge2';
 
 // IMPORTANT: Use api_mode: 2 as the xbee-arduino library requires it
 // Create the xbeeAPI object which handles parsing and generating of API frames
