@@ -111,7 +111,7 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
                 }
                 readingsList.temperatures.push({
                     deviceID: frame.remote64,
-                    value: parseFloat(frame.data.toString('ascii'));
+                    value: parseFloat(frame.data.toString('ascii'))
                 });
             }
         });
