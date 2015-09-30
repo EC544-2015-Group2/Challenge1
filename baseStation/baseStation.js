@@ -77,7 +77,7 @@ var Serial = new serialPort.SerialPort(portName, serialOptions, openImmediately,
         var deviceList = [];
 
         // Create timer variables to keep track of time during periods
-        var timestamp = date.now(); // change to date.now()
+        var timestamp = Date.now(); // change to date.now()
         var remainingPeriod = 15000;
 
         // This attaches a asynchronous callback function to a 'frame_object' event that gets called when the xbeeAPI object parses a complete API frame on the serial port. The callback is called with the frame as an argument.
